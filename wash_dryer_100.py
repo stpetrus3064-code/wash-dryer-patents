@@ -3,7 +3,7 @@
 wash-dryer-patents
 Scarica 100 brevetti Wash & Dryer (CPC=D06F) da Espacenet
 1 req/s per rispettare anti-bot
-NO controllo token (free trial safe)
+NO token check (free trial safe)
 """
 
 import os, csv, time, requests
@@ -30,32 +30,34 @@ def get_page(page):
     return r.text
 
 def parse_html(html):
-    """Parsa HTML Espacenet -> lista dict"""
+    """Parsa HTML Espacenet -> lista dict (robusto)"""
     soup = BeautifulSoup(html, "lxml")
     rows = []
     for card in soup.select("div.publication-content"):
-        pn  = card.select_one("span.publication-number").get_text(strip=True)
-        ttl = card.select_one("span.title").get_text(strip=True)
-        # --- altri campi (placeholder) ---
+        pn  = card.select_one("span.publication-number")
+        ttl = card.select_one("span.title")
+        if not (pn and ttl):                       # salta se mancano dati
+            continue
         rows.append({
-            "publication_number": pn,
-            "title": ttl,
-            "filing_date": "",
+            "publication_number": pn.get_text(strip=True),
+            "title": ttl.get_text(strip=True),
+            "filing_date": "",        # placeholder
             "publication_date": "",
             "applicant": "",
             "inventor": "",
             "cpc": "D06F",
             "ipc": "",
-            "country": pn[:2],
-            "kind": pn[-2:],
+            "country": pn.get_text(strip=True)[:2],
+            "kind": pn.get_text(strip=True)[-2:],
             "citation_count": 0,
             "family_size": 1,
-            "pdf_url": f"https://patentimages.storage.googleapis.com/{pn}.pdf"
+            "pdf_url": f"https://patentimages.storage.googleapis.com/{pn.get_text(strip=True)}.pdf"
         })
     return rows
 
 def main():
     print("START → extraction 100 patents (1 req/s)")
+    written = 0
     with open(CSV_FILE, "w", newline='', encoding="utf8") as f:
         writer = csv.DictWriter(f, fieldnames=FIELDS)
         writer.writeheader()
@@ -64,8 +66,9 @@ def main():
             rows = parse_html(html)
             for r in rows:
                 writer.writerow(r)
+                written += 1
             time.sleep(RATE)        # 1 secondo ESATTO
-    print(f"DONE → saved {len(rows)*PAGE_SIZE} rows in {CSV_FILE}")
+    print(f"DONE → saved {written} rows in {CSV_FILE}")
 
 if __name__ == "__main__":
     main()
